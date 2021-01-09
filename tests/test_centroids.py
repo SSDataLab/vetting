@@ -32,7 +32,7 @@ def test_centroid_test():
     # True transit should be significant
     assert r["pvalues"][0][0] < 0.01
     # Random transit shouldn't be significant
-    assert r["pvalues"][0][1] > 0.5
+    assert r["pvalues"][0][1] > 0.2
     assert len(r["pvalues"][0]) == 2
 
     r = centroid_test(
