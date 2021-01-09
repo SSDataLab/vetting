@@ -4,6 +4,10 @@ version = "0.1.0"
 description = "Simple, stand-alone vetting tools for transiting signals in Keper, K2 and TESS data"
 authors = ["Christina Hedges <christina.l.hedges@nasa.gov>"]
 license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/SSDataLab/vetting"
+repository = "https://github.com/SSDataLab/vetting"
+keywords = ["NASA, Kepler, K2, TESS, Astronomy"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
