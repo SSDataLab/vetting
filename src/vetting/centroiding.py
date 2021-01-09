@@ -6,17 +6,21 @@ from scipy.stats import ttest_ind
 import corner
 import lightkurve as lk
 
-def _label(tpf):
-    if hasattr(tpf, 'quarter'):
-        return f'{tpf.to_lightcurve().label}, Quarter {tpf.quarter}'
-    elif hasattr(tpf, 'campaign'):
-        return f'{tpf.to_lightcurve().label}, Campaign {tpf.campaign}'
-    elif hasattr(tpf, 'sector'):
-        return f'{tpf.to_lightcurve().label}, Sector {tpf.sector}'
-    else:
-        return '{tpf.to_lightcurve().label}'
 
-def centroid_test(tpfs, periods, t0s, durs, kernel=21, aperture_mask='pipeline', plot=True):
+def _label(tpf):
+    if hasattr(tpf, "quarter"):
+        return f"{tpf.to_lightcurve().label}, Quarter {tpf.quarter}"
+    elif hasattr(tpf, "campaign"):
+        return f"{tpf.to_lightcurve().label}, Campaign {tpf.campaign}"
+    elif hasattr(tpf, "sector"):
+        return f"{tpf.to_lightcurve().label}, Sector {tpf.sector}"
+    else:
+        return "{tpf.to_lightcurve().label}"
+
+
+def centroid_test(
+    tpfs, periods, t0s, durs, kernel=21, aperture_mask="pipeline", plot=True
+):
     """
     Runs a simple centroiding test on TPFs for input period, t0 and durations of transiting planet candidates.
 
@@ -59,21 +63,23 @@ def centroid_test(tpfs, periods, t0s, durs, kernel=21, aperture_mask='pipeline',
     """
     if not isinstance(tpfs, list):
         tpfs = [tpfs]
-    if not hasattr(periods, '__iter__'):
+    if not hasattr(periods, "__iter__"):
         periods = [periods]
-    if not hasattr(t0s, '__iter__'):
+    if not hasattr(t0s, "__iter__"):
         t0s = [t0s]
-    if not hasattr(durs, '__iter__'):
+    if not hasattr(durs, "__iter__"):
         durs = [durs]
 
     nplanets = len(periods)
     r = {}
-    r['figs'] = []
-    r['pvalues'] = []
+    r["figs"] = []
+    r["pvalues"] = []
     for tpf in tpfs:
-        crwd = tpfs[0].hdu[1].header['CROWDSAP']
+        crwd = tpfs[0].hdu[1].header["CROWDSAP"]
         if crwd < 0.8:
-            raise ValueError(f'Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases.')
+            raise ValueError(
+                f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
+            )
 
         aper = tpf._parse_aperture_mask(aperture_mask)
         mask = (np.abs((tpf.pos_corr1)) < 10) & ((np.gradient(tpf.pos_corr2)) < 10)
@@ -83,30 +89,42 @@ def centroid_test(tpfs, periods, t0s, durs, kernel=21, aperture_mask='pipeline',
 
         tmasks = []
         for period, t0, duration in zip(periods, t0s, durs):
-            bls = lc.to_periodogram('bls', period=[period, period], duration=duration)
-            t_mask = bls.get_transit_mask(period=period, transit_time=t0, duration=duration)
+            bls = lc.to_periodogram("bls", period=[period, period], duration=duration)
+            t_mask = bls.get_transit_mask(
+                period=period, transit_time=t0, duration=duration
+            )
             tmasks.append(t_mask)
-        tmasks= np.asarray(tmasks)
-        Y, X = np.mgrid[:tpf.shape[1], :tpf.shape[2]]
+        tmasks = np.asarray(tmasks)
+        Y, X = np.mgrid[: tpf.shape[1], : tpf.shape[2]]
         X = (X[aper][:, None] * np.ones(tpf.shape[0])).T
         Y = (Y[aper][:, None] * np.ones(tpf.shape[0])).T
-        X = (X[:, :, None] * np.ones(40))
-        Y = (Y[:, :, None] * np.ones(40))
-        fe  = np.asarray([np.random.normal(tpf.flux[:, aper], tpf.flux_err[:, aper]) for idx in range(40)]).transpose([1, 2, 0])
+        X = X[:, :, None] * np.ones(40)
+        Y = Y[:, :, None] * np.ones(40)
+        fe = np.asarray(
+            [
+                np.random.normal(tpf.flux[:, aper], tpf.flux_err[:, aper])
+                for idx in range(40)
+            ]
+        ).transpose([1, 2, 0])
         xcent = np.average(X, weights=fe, axis=1)
         ycent = np.average(Y, weights=fe, axis=1)
 
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
 
-
-
         breaks = np.where(np.diff(tpf.time) > 0.1)[0] + 1
-        ms = [np.in1d(np.arange(len(tpf.time)), i) for i in np.array_split(np.arange(len(tpf.time)), breaks)]
+        ms = [
+            np.in1d(np.arange(len(tpf.time)), i)
+            for i in np.array_split(np.arange(len(tpf.time)), breaks)
+        ]
         xtr, ytr = [], []
         for m in ms:
-            xtr.append(convolve(xcent[:, 0][m], Gaussian1DKernel(kernel), boundary='extend'))
-            ytr.append(convolve(ycent[:, 0][m], Gaussian1DKernel(kernel), boundary='extend'))
+            xtr.append(
+                convolve(xcent[:, 0][m], Gaussian1DKernel(kernel), boundary="extend")
+            )
+            ytr.append(
+                convolve(ycent[:, 0][m], Gaussian1DKernel(kernel), boundary="extend")
+            )
 
         xtr = np.hstack(xtr)
         ytr = np.hstack(ytr)
@@ -115,42 +133,76 @@ def centroid_test(tpfs, periods, t0s, durs, kernel=21, aperture_mask='pipeline',
         ysamps = np.random.normal(ycent[:, 0] - ytr, ycent[:, 1], size=(50, len(ycent)))
 
         if plot:
-            with plt.style.context('seaborn-white'):
-                fig, axs = plt.subplots(1, nplanets, figsize=(4*nplanets, 4), sharex=True, sharey=True, facecolor='w')
-                if not hasattr(axs, '__iter__'):
+            with plt.style.context("seaborn-white"):
+                fig, axs = plt.subplots(
+                    1,
+                    nplanets,
+                    figsize=(4 * nplanets, 4),
+                    sharex=True,
+                    sharey=True,
+                    facecolor="w",
+                )
+                if not hasattr(axs, "__iter__"):
                     axs = [axs]
-        letter = 'bcd'
+        letter = "bcd"
         pvalues = []
         for idx in range(nplanets):
             k1 = (tmasks).all(axis=0)
             k2 = ~tmasks[idx]
-#            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
+            #            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
             if plot:
-                with plt.style.context('seaborn-white'):
-                    corner.hist2d(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], ax=axs[idx])
-                    axs[idx].errorbar(xcent[:, 0][k2] - xtr[k2], ycent[:, 0][k2] - ytr[k2], xerr=xcent[:, 1][k2], yerr=ycent[:, 1][k2], c=f'C{idx}', lw=1, ls='', label=f'Transit {letter[idx]} Cadences')
-                    axs[idx].set(xlabel='X Pixel Centroid', title=f'Transit {letter[idx]}')
-                    axs[idx].legend(loc='upper left')
+                with plt.style.context("seaborn-white"):
+                    corner.hist2d(
+                        xcent[:, 0][k1] - xtr[k1],
+                        ycent[:, 0][k1] - ytr[k1],
+                        ax=axs[idx],
+                    )
+                    axs[idx].errorbar(
+                        xcent[:, 0][k2] - xtr[k2],
+                        ycent[:, 0][k2] - ytr[k2],
+                        xerr=xcent[:, 1][k2],
+                        yerr=ycent[:, 1][k2],
+                        c=f"C{idx}",
+                        lw=1,
+                        ls="",
+                        label=f"Transit {letter[idx]} Cadences",
+                    )
+                    axs[idx].set(
+                        xlabel="X Pixel Centroid", title=f"Transit {letter[idx]}"
+                    )
+                    axs[idx].legend(loc="upper left")
             ps = []
             for x1, y1 in zip(xsamps, ysamps):
-                px = ttest_ind(x1[k1], x1[k2], equal_var = False)
-                py = ttest_ind(y1[k1], y1[k2], equal_var = False)
+                px = ttest_ind(x1[k1], x1[k2], equal_var=False)
+                py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
             pvalue = np.mean(ps)
             if plot:
-                with plt.style.context('seaborn-white'):
+                with plt.style.context("seaborn-white"):
                     if pvalue > 0.05:
-                        axs[idx].text(0.975, 0.05, f'No Significant Offset (p-value: {pvalue:.2E})', horizontalalignment='right',
-                                              verticalalignment='center', transform=axs[idx].transAxes)
+                        axs[idx].text(
+                            0.975,
+                            0.05,
+                            f"No Significant Offset (p-value: {pvalue:.2E})",
+                            horizontalalignment="right",
+                            verticalalignment="center",
+                            transform=axs[idx].transAxes,
+                        )
                     else:
-                        axs[idx].text(0.975, 0.05, f'Offset Detected(p-value: {pvalue:.2E})', horizontalalignment='right',
-                                              verticalalignment='center', transform=axs[idx].transAxes)
+                        axs[idx].text(
+                            0.975,
+                            0.05,
+                            f"Offset Detected(p-value: {pvalue:.2E})",
+                            horizontalalignment="right",
+                            verticalalignment="center",
+                            transform=axs[idx].transAxes,
+                        )
                     plt.suptitle(_label(tpf))
 
-                    axs[0].set_ylabel('Y Pixel Centroid')
+                    axs[0].set_ylabel("Y Pixel Centroid")
                     plt.subplots_adjust(wspace=0)
-                    r['figs'].append(fig)
+                    r["figs"].append(fig)
 
             pvalues.append(pvalue)
-        r['pvalues'].append(tuple(pvalues))
+        r["pvalues"].append(tuple(pvalues))
     return r
