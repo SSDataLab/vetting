@@ -3,6 +3,7 @@
 **`vetting` contains simple, stand-alone Python tools for vetting transiting signals in NASA's Kepler, K2 and TESS data. `vetting` requires an installation of Python 3.8 or higher.**
 
 ![pytest](https://github.com/ssdatalab/vetting/workflows/pytest/badge.svg)
+[![pypi](https://img.shields.io/pypi/v/vetting)](https://pypi.org/project/vetting/)
 
 ## Installation
 
