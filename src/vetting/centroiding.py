@@ -4,7 +4,6 @@ from astropy.convolution import convolve, Gaussian1DKernel
 
 from scipy.stats import ttest_ind
 import corner
-import lightkurve as lk
 
 
 def _label(tpf):
