@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.convolution import convolve, Gaussian1DKernel
+import lightkurve as lk
 
 from scipy.stats import ttest_ind
 import corner
@@ -60,8 +61,10 @@ def centroid_test(
             Each tuple contains the p-value for the input planets. There are as many tuples as input TPFs.
 
     """
-    if not isinstance(tpfs, list):
+    if isinstance(tpfs, lk.targetpixelfile.TargetPixelFile):
         tpfs = [tpfs]
+    if isinstance(tpfs, lk.collections.TargetPixelFileCollection):
+        tpfs = [tpf for tpf in tpfs]
     if not hasattr(periods, "__iter__"):
         periods = [periods]
     if not hasattr(t0s, "__iter__"):
@@ -74,11 +77,12 @@ def centroid_test(
     r["figs"] = []
     r["pvalues"] = []
     for tpf in tpfs:
-        crwd = tpfs[0].hdu[1].header["CROWDSAP"]
-        if crwd < 0.8:
-            raise ValueError(
-                f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
-            )
+        crwd = tpf.hdu[1].header["CROWDSAP"]
+        if crwd is not None:
+            if crwd < 0.8:
+                raise ValueError(
+                    f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
+                )
 
         aper = tpf._parse_aperture_mask(aperture_mask)
         mask = (np.abs((tpf.pos_corr1)) < 10) & ((np.gradient(tpf.pos_corr2)) < 10)
@@ -89,7 +93,7 @@ def centroid_test(
         tmasks = []
         for period, t0, duration in zip(periods, t0s, durs):
             bls = lc.to_periodogram("bls", period=[period, period], duration=duration)
-            t_mask = bls.get_transit_mask(
+            t_mask = ~bls.get_transit_mask(
                 period=period, transit_time=t0, duration=duration
             )
             tmasks.append(t_mask)
@@ -110,6 +114,32 @@ def centroid_test(
 
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
+
+        # If the mission is K2, we need to use SFF to detrend the centroids.
+        if tpf.mission.lower() in ["ktwo", "k2"]:
+            xlc = lk.KeplerLightCurve(
+                time=tpf.time,
+                flux=xcent[:, 0],
+                flux_err=xcent[:, 1],
+                centroid_col=tpf.pos_corr1,
+                centroid_row=tpf.pos_corr2,
+                targetid="x",
+            )
+            s = lk.SFFCorrector(xlc)
+            s.correct(windows=20, bins=10, cadence_mask=t_mask)
+            xcent[:, 0] -= s.model_lc.flux.value
+
+            ylc = lk.KeplerLightCurve(
+                time=tpf.time,
+                flux=ycent[:, 0],
+                flux_err=ycent[:, 1],
+                centroid_col=tpf.pos_corr1,
+                centroid_row=tpf.pos_corr2,
+                targetid="y",
+            )
+            s = lk.SFFCorrector(ylc)
+            s.correct(windows=20, bins=10, cadence_mask=t_mask)
+            ycent[:, 0] -= s.model_lc.flux.value
 
         breaks = np.where(np.diff(tpf.time) > 0.1)[0] + 1
         ms = [
@@ -146,7 +176,9 @@ def centroid_test(
         letter = "bcd"
         pvalues = []
         for idx in range(nplanets):
+            # NO Transits
             k1 = (tmasks).all(axis=0)
+            # Transits of planet IDX
             k2 = ~tmasks[idx]
             #            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
             if plot:
@@ -175,7 +207,9 @@ def centroid_test(
                 px = ttest_ind(x1[k1], x1[k2], equal_var=False)
                 py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
+
             pvalue = np.mean(ps)
+            pvalues.append(pvalue)
             if plot:
                 with plt.style.context("seaborn-white"):
                     if pvalue > 0.05:
@@ -202,6 +236,5 @@ def centroid_test(
                     plt.subplots_adjust(wspace=0)
                     r["figs"].append(fig)
 
-            pvalues.append(pvalue)
         r["pvalues"].append(tuple(pvalues))
     return r
