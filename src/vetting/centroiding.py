@@ -61,8 +61,10 @@ def centroid_test(
             Each tuple contains the p-value for the input planets. There are as many tuples as input TPFs.
 
     """
-    if not isinstance(tpfs, list):
+    if isinstance(tpfs, lk.targetpixelfile.TargetPixelFile):
         tpfs = [tpfs]
+    if isinstance(tpfs, lk.collections.TargetPixelFileCollection):
+        tpfs = [tpf for tpf in tpfs]
     if not hasattr(periods, "__iter__"):
         periods = [periods]
     if not hasattr(t0s, "__iter__"):
@@ -75,7 +77,7 @@ def centroid_test(
     r["figs"] = []
     r["pvalues"] = []
     for tpf in tpfs:
-        crwd = tpfs[0].hdu[1].header["CROWDSAP"]
+        crwd = tpf.hdu[1].header["CROWDSAP"]
         if crwd is not None:
             if crwd < 0.8:
                 raise ValueError(
