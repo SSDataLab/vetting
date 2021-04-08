@@ -91,7 +91,7 @@ def centroid_test(
         tmasks = []
         for period, t0, duration in zip(periods, t0s, durs):
             bls = lc.to_periodogram("bls", period=[period, period], duration=duration)
-            t_mask = bls.get_transit_mask(
+            t_mask = ~bls.get_transit_mask(
                 period=period, transit_time=t0, duration=duration
             )
             tmasks.append(t_mask)
@@ -124,7 +124,7 @@ def centroid_test(
                 targetid="x",
             )
             s = lk.SFFCorrector(xlc)
-            s.correct(windows=20, bins=10, cadence_mask=~t_mask)
+            s.correct(windows=20, bins=10, cadence_mask=t_mask)
             xcent[:, 0] -= s.model_lc.flux.value
 
             ylc = lk.KeplerLightCurve(
@@ -136,7 +136,7 @@ def centroid_test(
                 targetid="y",
             )
             s = lk.SFFCorrector(ylc)
-            s.correct(windows=20, bins=10, cadence_mask=~t_mask)
+            s.correct(windows=20, bins=10, cadence_mask=t_mask)
             ycent[:, 0] -= s.model_lc.flux.value
 
         breaks = np.where(np.diff(tpf.time) > 0.1)[0] + 1
@@ -174,7 +174,9 @@ def centroid_test(
         letter = "bcd"
         pvalues = []
         for idx in range(nplanets):
+            # NO Transits
             k1 = (tmasks).all(axis=0)
+            # Transits of planet IDX
             k2 = ~tmasks[idx]
             #            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
             if plot:
@@ -203,7 +205,9 @@ def centroid_test(
                 px = ttest_ind(x1[k1], x1[k2], equal_var=False)
                 py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
+
             pvalue = np.mean(ps)
+            pvalues.append(pvalue)
             if plot:
                 with plt.style.context("seaborn-white"):
                     if pvalue > 0.05:
@@ -230,6 +234,5 @@ def centroid_test(
                     plt.subplots_adjust(wspace=0)
                     r["figs"].append(fig)
 
-            pvalues.append(pvalue)
         r["pvalues"].append(tuple(pvalues))
     return r
