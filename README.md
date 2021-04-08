@@ -17,7 +17,7 @@ pip install vetting
 
 An example of a simple test is shown below.
 
-![Example of simple centroid test](demo.png)
+![Example of simple centroid test](https://github.com/SSDataLab/vetting/raw/main/demo.png)
 
 Here a significant offset is detected in the centroid of false positive KOI-608 during transit. The p-value for the points during transit being drawn from the same distribution as the points out of transit is low, (there is a less than 1% chance these are drawn from the same distribution). To recreate this example you can use the following script:
 
