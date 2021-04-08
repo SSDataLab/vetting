@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.convolution import convolve, Gaussian1DKernel
+import lightkurve as lk
 
 from scipy.stats import ttest_ind
 import corner
@@ -75,10 +76,11 @@ def centroid_test(
     r["pvalues"] = []
     for tpf in tpfs:
         crwd = tpfs[0].hdu[1].header["CROWDSAP"]
-        if crwd < 0.8:
-            raise ValueError(
-                f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
-            )
+        if crwd is not None:
+            if crwd < 0.8:
+                raise ValueError(
+                    f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
+                )
 
         aper = tpf._parse_aperture_mask(aperture_mask)
         mask = (np.abs((tpf.pos_corr1)) < 10) & ((np.gradient(tpf.pos_corr2)) < 10)
@@ -110,6 +112,32 @@ def centroid_test(
 
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
+
+        # If the mission is K2, we need to use SFF to detrend the centroids.
+        if tpf.mission.lower() in ["ktwo", "k2"]:
+            xlc = lk.KeplerLightCurve(
+                time=tpf.time,
+                flux=xcent[:, 0],
+                flux_err=xcent[:, 1],
+                centroid_col=tpf.pos_corr1,
+                centroid_row=tpf.pos_corr2,
+                targetid="x",
+            )
+            s = lk.SFFCorrector(xlc)
+            s.correct(windows=20, bins=10, cadence_mask=~t_mask)
+            xcent[:, 0] -= s.model_lc.flux.value
+
+            ylc = lk.KeplerLightCurve(
+                time=tpf.time,
+                flux=ycent[:, 0],
+                flux_err=ycent[:, 1],
+                centroid_col=tpf.pos_corr1,
+                centroid_row=tpf.pos_corr2,
+                targetid="y",
+            )
+            s = lk.SFFCorrector(ylc)
+            s.correct(windows=20, bins=10, cadence_mask=~t_mask)
+            ycent[:, 0] -= s.model_lc.flux.value
 
         breaks = np.where(np.diff(tpf.time) > 0.1)[0] + 1
         ms = [
