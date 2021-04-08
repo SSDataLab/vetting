@@ -141,7 +141,8 @@ def centroid_test(
             s.correct(windows=20, bins=10, cadence_mask=t_mask)
             ycent[:, 0] -= s.model_lc.flux.value
 
-        breaks = np.where(np.diff(tpf.time) > 0.1)[0] + 1
+        dt = np.diff(tpf.time.jd)
+        breaks = np.where(dt > 10 * np.median(dt))[0] + 1
         ms = [
             np.in1d(np.arange(len(tpf.time)), i)
             for i in np.array_split(np.arange(len(tpf.time)), breaks)
@@ -173,7 +174,7 @@ def centroid_test(
                 )
                 if not hasattr(axs, "__iter__"):
                     axs = [axs]
-        letter = "bcd"
+        letter = "bcdefghijklmnopqrstu"
         pvalues = []
         for idx in range(nplanets):
             # NO Transits
