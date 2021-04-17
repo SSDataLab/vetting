@@ -19,7 +19,7 @@ def _label(tpf):
 
 
 def centroid_test(
-    tpfs, periods, t0s, durs, kernel=21, aperture_mask="pipeline", plot=True
+    tpfs, periods, t0s, durs, kernel=21, aperture_mask="pipeline", plot=True, nsamp=50
 ):
     """
     Runs a simple centroiding test on TPFs for input period, t0 and durations of transiting planet candidates.
@@ -53,6 +53,8 @@ def centroid_test(
             `pipeline` will use the pipeline mask, and `threshold` will use all contiguous pixels above a 3 sigma threshold.
         plot : bool
             Whether or not to plot results.
+        nsamp : int
+            Number of samples to make when testing (default 50)
 
     Returns
     -------
@@ -74,8 +76,10 @@ def centroid_test(
 
     nplanets = len(periods)
     r = {}
-    r["figs"] = []
-    r["pvalues"] = []
+    for key in ["figs", "pvalues", "1sigma_distance", "3sigma_distance"]:
+        r[key] = []
+
+    offsets = np.logspace(-6, np.log10(3), 100)[::-1]
     for tpf in tpfs:
         crwd = tpf.hdu[1].header["CROWDSAP"]
         if crwd is not None:
@@ -101,14 +105,15 @@ def centroid_test(
         Y, X = np.mgrid[: tpf.shape[1], : tpf.shape[2]]
         X = (X[aper][:, None] * np.ones(tpf.shape[0])).T
         Y = (Y[aper][:, None] * np.ones(tpf.shape[0])).T
-        X = X[:, :, None] * np.ones(40)
-        Y = Y[:, :, None] * np.ones(40)
+        X = X[:, :, None] * np.ones(nsamp)
+        Y = Y[:, :, None] * np.ones(nsamp)
         fe = np.asarray(
             [
                 np.random.normal(tpf.flux[:, aper], tpf.flux_err[:, aper])
-                for idx in range(40)
+                for idx in range(nsamp)
             ]
         ).transpose([1, 2, 0])
+
         xcent = np.average(X, weights=fe, axis=1)
         ycent = np.average(Y, weights=fe, axis=1)
 
@@ -159,8 +164,12 @@ def centroid_test(
         xtr = np.hstack(xtr)
         ytr = np.hstack(ytr)
 
-        xsamps = np.random.normal(xcent[:, 0] - xtr, xcent[:, 1], size=(50, len(xcent)))
-        ysamps = np.random.normal(ycent[:, 0] - ytr, ycent[:, 1], size=(50, len(ycent)))
+        xsamps = np.random.normal(
+            xcent[:, 0] - xtr, xcent[:, 1], size=(nsamp, len(xcent))
+        )
+        ysamps = np.random.normal(
+            ycent[:, 0] - ytr, ycent[:, 1], size=(nsamp, len(ycent))
+        )
 
         if plot:
             with plt.style.context("seaborn-white"):
@@ -175,7 +184,7 @@ def centroid_test(
                 if not hasattr(axs, "__iter__"):
                     axs = [axs]
         letter = "bcdefghijklmnopqrstu"
-        pvalues = []
+        pvalues, sigma1, sigma3 = [], [], []
         for idx in range(nplanets):
             # NO Transits
             k1 = (tmasks).all(axis=0)
@@ -203,14 +212,57 @@ def centroid_test(
                         xlabel="X Pixel Centroid", title=f"Transit {letter[idx]}"
                     )
                     axs[idx].legend(loc="upper left")
+
             ps = []
+            ps1 = []
             for x1, y1 in zip(xsamps, ysamps):
                 px = ttest_ind(x1[k1], x1[k2], equal_var=False)
                 py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
 
-            pvalue = np.mean(ps)
+                # Choose a random sample from the main distribution
+                k3 = np.random.choice(np.where(k1)[0], k2.sum())
+                x2 = np.random.normal(xcent[k3, 0] - xtr[k3], xcent[k3, 1])
+                y2 = np.random.normal(ycent[k3, 0] - ytr[k3], ycent[k3, 1])
+
+                # Not the sample
+                k4 = np.where(k1)[0][~np.in1d(np.where(k1)[0], k3)]
+                px = np.asarray(
+                    [ttest_ind(x1[k4], x2 + o, equal_var=False).pvalue for o in offsets]
+                )
+                py = np.asarray(
+                    [ttest_ind(y1[k4], y2 + o, equal_var=False).pvalue for o in offsets]
+                )
+                ps1.append(np.mean([px, py], axis=0))
+
+            locs = np.asarray(
+                [np.where(p < 0.317)[0][-1] for p in ps1 if (p < 0.317).any()]
+            )
+            if len(locs) == 0:
+                sigma1.append(np.nan)
+            else:
+                try:
+                    sigma1.append(np.percentile(offsets[locs], 90))
+                except:
+                    sigma1.append(np.nan)
+
+            locs = np.asarray(
+                [np.where(p < 0.003)[0][-1] for p in ps1 if (p < 0.003).any()]
+            )
+            if len(locs) == 0:
+                sigma3.append(np.nan)
+            else:
+                try:
+                    sigma3.append(np.percentile(offsets[locs], 90))
+                except:
+                    sigma3.append(np.nan)
+
+            if k2.sum() == 0:
+                pvalue = 1
+            else:
+                pvalue = np.mean(ps)
             pvalues.append(pvalue)
+
             if plot:
                 with plt.style.context("seaborn-white"):
                     if pvalue > 0.05:
@@ -238,4 +290,9 @@ def centroid_test(
                     r["figs"].append(fig)
 
         r["pvalues"].append(tuple(pvalues))
+        r["1sigma_distance"].append(tuple(sigma1))
+        r["3sigma_distance"].append(tuple(sigma3))
+
+    #        import pdb
+    #        pdb.set_trace()
     return r
