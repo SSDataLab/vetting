@@ -19,6 +19,12 @@ def _label(tpf):
         return "{tpf.to_lightcurve().label}"
 
 
+def weighted_average(values, weights, axis=None):
+    mean = np.average(values, weights=weights, axis=axis)
+    error = np.average((values - mean) ** 2, weights=weights, axis=axis) ** 0.5
+    return mean, error / len(values) ** 0.5
+
+
 def centroid_test(
     tpfs,
     periods,
@@ -27,7 +33,7 @@ def centroid_test(
     kernel=21,
     aperture_mask="pipeline",
     plot=True,
-    nsamp=50,
+    nsamp=100,
     transit_depths=None,
 ):
     """
@@ -135,6 +141,7 @@ def centroid_test(
         Y, X = np.mgrid[: tpf.shape[1], : tpf.shape[2]]
         X = (X[aper][:, None] * np.ones(tpf.shape[0])).T
         Y = (Y[aper][:, None] * np.ones(tpf.shape[0])).T
+
         X = X[:, :, None] * np.ones(nsamp)
         Y = Y[:, :, None] * np.ones(nsamp)
         fe = np.asarray(
@@ -146,7 +153,6 @@ def centroid_test(
 
         xcent = np.average(X, weights=fe, axis=1)
         ycent = np.average(Y, weights=fe, axis=1)
-
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
 
@@ -260,22 +266,12 @@ def centroid_test(
 
             if transit_depths is not None:
                 # Weighted average and weighted standard deviation of out of transit
-                a1 = (xcent[k1, 0] - xtr[k1]).mean(), (xcent[k1, 0] - xtr[k1]).std() / (
-                    k1.sum() ** 0.5
-                )
-                b1 = (ycent[k1, 0] - ytr[k1]).mean(), (ycent[k1, 0] - ytr[k1]).std() / (
-                    k1.sum() ** 0.5
-                )
-
-                # Weighted average and weighted standard deviation of out of in transit
-                a2 = (xcent[k2, 0] - xtr[k2]).mean(), (xcent[k2, 0] - xtr[k2]).std() / (
-                    k2.sum() ** 0.5
-                )
-                b2 = (ycent[k2, 0] - ytr[k2]).mean(), (ycent[k2, 0] - ytr[k2]).std() / (
-                    k2.sum() ** 0.5
-                )
-
-                pos_err = np.hypot(np.hypot(a1[1], a2[1]), np.hypot(b1[1], b2[1]))
+                a1 = weighted_average(xcent[k1, 0] - xtr[k1], 1 / xcent[k1, 1])
+                b1 = weighted_average(ycent[k1, 0] - ytr[k1], 1 / ycent[k1, 1])
+                # Weighted average and weighted standard deviation of out of transit
+                a2 = weighted_average(xcent[k2, 0] - xtr[k2], 1 / xcent[k2, 1])
+                b2 = weighted_average(ycent[k2, 0] - ytr[k2], 1 / ycent[k2, 1])
+                pos_err = np.hypot(np.hypot(a1[1], b1[1]), np.hypot(a2[1], b2[1]))
 
             if transit_depths is not None:
                 sigma1.append(pixel_scale * pos_err / transit_depths[idx])
