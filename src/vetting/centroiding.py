@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.convolution import convolve, Gaussian1DKernel
+import astropy.units as u
 import lightkurve as lk
 
 from scipy.stats import ttest_ind
@@ -18,8 +19,22 @@ def _label(tpf):
         return "{tpf.to_lightcurve().label}"
 
 
+def weighted_average(values, weights, axis=None):
+    mean = np.average(values, weights=weights, axis=axis)
+    error = np.average((values - mean) ** 2, weights=weights, axis=axis) ** 0.5
+    return mean, error / len(values) ** 0.5
+
+
 def centroid_test(
-    tpfs, periods, t0s, durs, kernel=21, aperture_mask="pipeline", plot=True, nsamp=50
+    tpfs,
+    periods,
+    t0s,
+    durs,
+    kernel=21,
+    aperture_mask="pipeline",
+    plot=True,
+    nsamp=100,
+    transit_depths=None,
 ):
     """
     Runs a simple centroiding test on TPFs for input period, t0 and durations of transiting planet candidates.
@@ -55,7 +70,8 @@ def centroid_test(
             Whether or not to plot results.
         nsamp : int
             Number of samples to make when testing (default 50)
-
+        transit_depths: None, List of floats
+            Optional. If given, will calculate the separation at which contaminants can be ruled out. Must be between 0 and 1.
     Returns
     -------
         r : dict
@@ -73,14 +89,34 @@ def centroid_test(
         t0s = [t0s]
     if not hasattr(durs, "__iter__"):
         durs = [durs]
+    if transit_depths is not None:
+        if not hasattr(transit_depths, "__iter__"):
+            transit_depths = [transit_depths]
+        if not len(transit_depths) == len(periods):
+            raise ValueError("Please pass same length `transit_depth` as `period`")
+        for transit_depth in transit_depths:
+            if (transit_depth < 0) | (transit_depth > 1):
+                raise ValueError("`transit_depth` must be > 0 and < 1. ")
 
     nplanets = len(periods)
     r = {}
-    for key in ["figs", "pvalues", "1sigma_distance", "3sigma_distance"]:
+    for key in ["figs", "pvalues", "centroid_offset_detected"]:
         r[key] = []
+    if transit_depths is not None:
+        for key in ["1sigma_error"]:
+            r[key] = []
 
     offsets = np.logspace(-6, np.log10(3), 100)[::-1]
     for tpf in tpfs:
+        if tpf.mission.lower() == "kepler":
+            pixel_scale = 4
+
+        elif tpf.mission.lower() == "tess":
+            pixel_scale = 27
+        else:
+            raise ValueError(
+                "Can not understand mission keyword in TPF to assign pixel scale."
+            )
         crwd = tpf.hdu[1].header["CROWDSAP"]
         if crwd is not None:
             if crwd < 0.8:
@@ -105,6 +141,7 @@ def centroid_test(
         Y, X = np.mgrid[: tpf.shape[1], : tpf.shape[2]]
         X = (X[aper][:, None] * np.ones(tpf.shape[0])).T
         Y = (Y[aper][:, None] * np.ones(tpf.shape[0])).T
+
         X = X[:, :, None] * np.ones(nsamp)
         Y = Y[:, :, None] * np.ones(nsamp)
         fe = np.asarray(
@@ -116,7 +153,6 @@ def centroid_test(
 
         xcent = np.average(X, weights=fe, axis=1)
         ycent = np.average(Y, weights=fe, axis=1)
-
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
 
@@ -184,7 +220,7 @@ def centroid_test(
                 if not hasattr(axs, "__iter__"):
                     axs = [axs]
         letter = "bcdefghijklmnopqrstu"
-        pvalues, sigma1, sigma3 = [], [], []
+        pvalues, sigma1, centroid_offset_detected = [], [], []
         for idx in range(nplanets):
             # NO Transits
             k1 = (tmasks).all(axis=0)
@@ -192,84 +228,77 @@ def centroid_test(
             k2 = ~tmasks[idx]
             #            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
             if plot:
+                if transit_depths is not None:
+                    scale = pixel_scale / transit_depths[idx]
+                    axs[idx].set(
+                        xlabel='X Centroid ["]', title=f"Transit {letter[idx]}"
+                    )
+                else:
+                    scale = 1
+                    axs[idx].set(
+                        xlabel="X Centroid [pixel]", title=f"Transit {letter[idx]}"
+                    )
+
                 with plt.style.context("seaborn-white"):
                     corner.hist2d(
-                        xcent[:, 0][k1] - xtr[k1],
-                        ycent[:, 0][k1] - ytr[k1],
+                        (xcent[:, 0][k1] - xtr[k1]) * scale,
+                        (ycent[:, 0][k1] - ytr[k1]) * scale,
                         ax=axs[idx],
                     )
                     axs[idx].errorbar(
-                        xcent[:, 0][k2] - xtr[k2],
-                        ycent[:, 0][k2] - ytr[k2],
-                        xerr=xcent[:, 1][k2],
-                        yerr=ycent[:, 1][k2],
+                        (xcent[:, 0][k2] - xtr[k2]) * scale,
+                        (ycent[:, 0][k2] - ytr[k2]) * scale,
+                        xerr=(xcent[:, 1][k2]) * scale,
+                        yerr=(ycent[:, 1][k2]) * scale,
                         c=f"C{idx}",
                         lw=1,
                         ls="",
                         label=f"Transit {letter[idx]} Cadences",
                     )
-                    axs[idx].set(
-                        xlabel="X Pixel Centroid", title=f"Transit {letter[idx]}"
-                    )
                     axs[idx].legend(loc="upper left")
 
             ps = []
-            ps1 = []
+            # ps1 = []
             for x1, y1 in zip(xsamps, ysamps):
                 px = ttest_ind(x1[k1], x1[k2], equal_var=False)
                 py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
 
-                # Choose a random sample from the main distribution
-                k3 = np.random.choice(np.where(k1)[0], k2.sum())
-                x2 = np.random.normal(xcent[k3, 0] - xtr[k3], xcent[k3, 1])
-                y2 = np.random.normal(ycent[k3, 0] - ytr[k3], ycent[k3, 1])
+            if transit_depths is not None:
+                # Weighted average and weighted standard deviation of out of transit
+                a1 = weighted_average(xcent[k1, 0] - xtr[k1], 1 / xcent[k1, 1])
+                b1 = weighted_average(ycent[k1, 0] - ytr[k1], 1 / ycent[k1, 1])
+                # Weighted average and weighted standard deviation of out of transit
+                a2 = weighted_average(xcent[k2, 0] - xtr[k2], 1 / xcent[k2, 1])
+                b2 = weighted_average(ycent[k2, 0] - ytr[k2], 1 / ycent[k2, 1])
+                pos_err = np.hypot(np.hypot(a1[1], b1[1]), np.hypot(a2[1], b2[1]))
 
-                # Not the sample
-                k4 = np.where(k1)[0][~np.in1d(np.where(k1)[0], k3)]
-                px = np.asarray(
-                    [ttest_ind(x1[k4], x2 + o, equal_var=False).pvalue for o in offsets]
-                )
-                py = np.asarray(
-                    [ttest_ind(y1[k4], y2 + o, equal_var=False).pvalue for o in offsets]
-                )
-                ps1.append(np.mean([px, py], axis=0))
-
-            locs = np.asarray(
-                [np.where(p < 0.317)[0][-1] for p in ps1 if (p < 0.317).any()]
-            )
-            if len(locs) == 0:
-                sigma1.append(np.nan)
-            else:
-                try:
-                    sigma1.append(np.percentile(offsets[locs], 90))
-                except:
-                    sigma1.append(np.nan)
-
-            locs = np.asarray(
-                [np.where(p < 0.003)[0][-1] for p in ps1 if (p < 0.003).any()]
-            )
-            if len(locs) == 0:
-                sigma3.append(np.nan)
-            else:
-                try:
-                    sigma3.append(np.percentile(offsets[locs], 90))
-                except:
-                    sigma3.append(np.nan)
+            if transit_depths is not None:
+                sigma1.append(pixel_scale * pos_err / transit_depths[idx])
 
             if k2.sum() == 0:
                 pvalue = 1
             else:
                 pvalue = np.mean(ps)
             pvalues.append(pvalue)
+            if pvalue < 0.317:
+                centroid_offset_detected.append(True)
+            else:
+                centroid_offset_detected.append(False)
 
             if plot:
                 with plt.style.context("seaborn-white"):
-                    if pvalue > 0.05:
+                    if pvalue > 0.317:
+                        label = f"No Significant Offset (p-value: {pvalue:.2E})"
+                        if transit_depths is not None:
+                            label = (
+                                label
+                                + f"\n1 Sigma Error: {(np.round(sigma1[idx], 2) * u.arcsecond).to_string(format='latex')}"
+                            )
                         axs[idx].text(
                             0.975,
                             0.05,
-                            f"No Significant Offset (p-value: {pvalue:.2E})",
+                            label,
                             horizontalalignment="right",
                             verticalalignment="center",
                             transform=axs[idx].transAxes,
@@ -282,16 +311,21 @@ def centroid_test(
                             horizontalalignment="right",
                             verticalalignment="center",
                             transform=axs[idx].transAxes,
+                            color="r",
                         )
                     plt.suptitle(_label(tpf))
-
-                    axs[0].set_ylabel("Y Pixel Centroid")
+                    if transit_depths is not None:
+                        axs[0].set_ylabel('Y Centroid ["]')
+                    else:
+                        axs[0].set_ylabel("Y Centroid [pixel]")
                     plt.subplots_adjust(wspace=0)
-                    r["figs"].append(fig)
 
+        if transit_depths is not None:
+            r["1sigma_error"].append(np.asarray(sigma1) * u.arcsecond)
+        r["centroid_offset_detected"].append(np.asarray(centroid_offset_detected))
+        if plot:
+            r["figs"].append(fig)
         r["pvalues"].append(tuple(pvalues))
-        r["1sigma_distance"].append(tuple(sigma1))
-        r["3sigma_distance"].append(tuple(sigma3))
 
     #        import pdb
     #        pdb.set_trace()
