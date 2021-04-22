@@ -45,3 +45,17 @@ def test_centroid_test():
     )
     assert len(r["pvalues"]) == 2
     assert len(r["pvalues"][0]) == 2
+
+    r = centroid_test(
+        tpf,
+        period,
+        t0,
+        dur,
+        aperture_mask="pipeline",
+        plot=True,
+        transit_depths=0.001499,
+    )
+    assert "1sigma_error" in r.keys()
+    assert hasattr(r["1sigma_error"][0], "unit")
+    assert r["1sigma_error"][0].value > 0
+    assert r["1sigma_error"][0].value < 0.5
