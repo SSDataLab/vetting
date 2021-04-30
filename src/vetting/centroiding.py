@@ -108,7 +108,7 @@ def centroid_test(
 
     offsets = np.logspace(-6, np.log10(3), 100)[::-1]
     for tpf in tpfs:
-        if tpf.mission.lower() == "kepler":
+        if tpf.mission.lower() in ["kepler", "ktwo", "k2"]:
             pixel_scale = 4
 
         elif tpf.mission.lower() == "tess":
@@ -226,7 +226,6 @@ def centroid_test(
             k1 = (tmasks).all(axis=0)
             # Transits of planet IDX
             k2 = ~tmasks[idx]
-            #            axs[idx].errorbar(xcent[:, 0][k1] - xtr[k1], ycent[:, 0][k1] - ytr[k1], xerr=xcent[:, 1][k1], yerr=ycent[:, 1][k1], c='k', ls='', lw=0.3, label='No Planet Cadences')
             if plot:
                 if transit_depths is not None:
                     scale = pixel_scale / transit_depths[idx]
@@ -327,6 +326,4 @@ def centroid_test(
             r["figs"].append(fig)
         r["pvalues"].append(tuple(pvalues))
 
-    #        import pdb
-    #        pdb.set_trace()
     return r
