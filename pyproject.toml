@@ -10,7 +10,7 @@ repository = "https://github.com/SSDataLab/vetting"
 keywords = ["NASA, Kepler, K2, TESS, Astronomy"]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.7"
 lightkurve = ">=2.0.9"
 corner = "^2.1.0"
 
