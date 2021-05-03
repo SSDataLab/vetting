@@ -35,6 +35,7 @@ def centroid_test(
     plot=True,
     nsamp=100,
     transit_depths=None,
+    labels=None,
 ):
     """
     Runs a simple centroiding test on TPFs for input period, t0 and durations of transiting planet candidates.
@@ -72,6 +73,9 @@ def centroid_test(
             Number of samples to make when testing (default 50)
         transit_depths: None, List of floats
             Optional. If given, will calculate the separation at which contaminants can be ruled out. Must be between 0 and 1.
+        labels: None, list of strings, string
+            Optional. Label for each planet in plots. If None, will generate labels in sequential order. e.g. pass `'bcd'` to label
+            planets. Must same length as periods.
     Returns
     -------
         r : dict
@@ -93,10 +97,18 @@ def centroid_test(
         if not hasattr(transit_depths, "__iter__"):
             transit_depths = [transit_depths]
         if not len(transit_depths) == len(periods):
-            raise ValueError("Please pass same length `transit_depth` as `period`")
+            raise ValueError("Please pass same length `transit_depth` as `periods`")
         for transit_depth in transit_depths:
             if (transit_depth < 0) | (transit_depth > 1):
                 raise ValueError("`transit_depth` must be > 0 and < 1. ")
+
+    if labels is not None:
+        if not hasattr(labels, "__iter__"):
+            labels = [labels]
+        if not len(labels) == len(periods):
+            raise ValueError("Please pass same length `labels` as `periods`")
+    else:
+        labels = "bcdefghijklmnopqrstu"
 
     nplanets = len(periods)
     r = {}
@@ -219,7 +231,7 @@ def centroid_test(
                 )
                 if not hasattr(axs, "__iter__"):
                     axs = [axs]
-        letter = "bcdefghijklmnopqrstu"
+
         pvalues, sigma1, centroid_offset_detected = [], [], []
         for idx in range(nplanets):
             # NO Transits
@@ -230,12 +242,12 @@ def centroid_test(
                 if transit_depths is not None:
                     scale = pixel_scale / transit_depths[idx]
                     axs[idx].set(
-                        xlabel='X Centroid ["]', title=f"Transit {letter[idx]}"
+                        xlabel='X Centroid ["]', title=f"Transit {labels[idx]}"
                     )
                 else:
                     scale = 1
                     axs[idx].set(
-                        xlabel="X Centroid [pixel]", title=f"Transit {letter[idx]}"
+                        xlabel="X Centroid [pixel]", title=f"Transit {labels[idx]}"
                     )
 
                 with plt.style.context("seaborn-white"):
@@ -249,10 +261,11 @@ def centroid_test(
                         (ycent[:, 0][k2] - ytr[k2]) * scale,
                         xerr=(xcent[:, 1][k2]) * scale,
                         yerr=(ycent[:, 1][k2]) * scale,
+                        marker=".",
                         c=f"C{idx}",
                         lw=1,
                         ls="",
-                        label=f"Transit {letter[idx]} Cadences",
+                        label=f"Transit {labels[idx]} Cadences",
                     )
                     axs[idx].legend(loc="upper left")
 
