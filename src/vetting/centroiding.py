@@ -167,6 +167,7 @@ def centroid_test(
         ycent = np.average(Y, weights=fe, axis=1)
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
+        import pdb
 
         # If the mission is K2, we need to use SFF to detrend the centroids.
         if tpf.mission.lower() in ["ktwo", "k2"]:
@@ -179,7 +180,13 @@ def centroid_test(
                 targetid="x",
             )
             s = lk.SFFCorrector(xlc)
-            s.correct(windows=20, bins=10, cadence_mask=t_mask)
+            s.correct(
+                windows=20,
+                bins=10,
+                cadence_mask=t_mask,
+                propagate_errors=True,
+                timescale=10,
+            )
             xcent[:, 0] -= s.model_lc.flux.value
 
             ylc = lk.KeplerLightCurve(
@@ -191,7 +198,13 @@ def centroid_test(
                 targetid="y",
             )
             s = lk.SFFCorrector(ylc)
-            s.correct(windows=20, bins=10, cadence_mask=t_mask)
+            s.correct(
+                windows=20,
+                bins=10,
+                cadence_mask=t_mask,
+                propagate_errors=True,
+                timescale=10,
+            )
             ycent[:, 0] -= s.model_lc.flux.value
 
         dt = np.diff(tpf.time.jd)
@@ -251,10 +264,16 @@ def centroid_test(
                     )
 
                 with plt.style.context("seaborn-white"):
+                    xc1 = (xcent[:, 0][k1] - xtr[k1]) * scale
+                    yc1 = (ycent[:, 0][k1] - ytr[k1]) * scale
                     corner.hist2d(
-                        (xcent[:, 0][k1] - xtr[k1]) * scale,
-                        (ycent[:, 0][k1] - ytr[k1]) * scale,
+                        xc1,
+                        yc1,
                         ax=axs[idx],
+                        range=[
+                            np.nanpercentile(xc1, (1, 99)),
+                            np.nanpercentile(yc1, (1, 99)),
+                        ],
                     )
                     axs[idx].errorbar(
                         (xcent[:, 0][k2] - xtr[k2]) * scale,
@@ -262,6 +281,7 @@ def centroid_test(
                         xerr=(xcent[:, 1][k2]) * scale,
                         yerr=(ycent[:, 1][k2]) * scale,
                         marker=".",
+                        markersize=1,
                         c=f"C{idx}",
                         lw=1,
                         ls="",
