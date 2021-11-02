@@ -268,14 +268,14 @@ def centroid_test(
                     xc1 = (xcent[:, 0][k1] - xtr[k1]) * scale
                     yc1 = (ycent[:, 0][k1] - ytr[k1]) * scale
 
-                    xrange = np.nanpercentile(xc1, (1, 99))
+                    xrange = np.nanpercentile(xc1, (3, 97))
                     dx = np.diff(xrange) / 100
-                    xrange[0] -= dx * 15
-                    xrange[1] += dx * 15
-                    yrange = np.nanpercentile(yc1, (1, 99))
+                    xrange[0] -= dx * 30
+                    xrange[1] += dx * 30
+                    yrange = np.nanpercentile(yc1, (3, 97))
                     dy = np.diff(yrange) / 100
-                    yrange[0] -= dy * 15
-                    yrange[1] += dy * 15
+                    yrange[0] -= dy * 30
+                    yrange[1] += dy * 30
 
                     corner.hist2d(
                         xc1,
@@ -321,14 +321,14 @@ def centroid_test(
             else:
                 pvalue = np.mean(ps)
             pvalues.append(pvalue)
-            if pvalue < 0.317:
+            if pvalue < 0.05:
                 centroid_offset_detected.append(True)
             else:
                 centroid_offset_detected.append(False)
 
             if plot:
                 with plt.style.context("seaborn-white"):
-                    if pvalue > 0.317:
+                    if pvalue >= 0.05:
                         label = f"No Significant Offset (p-value: {pvalue:.2E})"
                         if transit_depths is not None:
                             label = (
