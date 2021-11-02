@@ -15,12 +15,7 @@ preferred-citation:
   - family-names: "Hedges"
     given-names: "Christina"
   orcid: "https://orcid.org/0000-0002-3385-8391
-  doi: #
   journal: "Research Notes of The American Astronomical Society"
   month: 11
-  start: # First page number
-  end: # Last page number
   title: "vetting: A standalone tool for finding centroid offsets in NASA Kepler, K2 and TESS, alerting the presence of exoplanet false positives"
-  issue: #
-  volume: #
   year: 2021
