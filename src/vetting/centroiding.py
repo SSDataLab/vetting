@@ -1,11 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from astropy.convolution import convolve, Gaussian1DKernel
 import astropy.units as u
-import lightkurve as lk
-
-from scipy.stats import ttest_ind
 import corner
+import lightkurve as lk
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.convolution import Gaussian1DKernel, convolve
+from scipy.stats import ttest_ind
 
 
 def _label(tpf):
@@ -81,8 +80,8 @@ def centroid_test(
         r : dict
             Dictionary of results, containing 'figs' (a list of matplotlib figures) and 'pvalues', which is a list of tuples.
             Each tuple contains the p-value for the input planets. There are as many tuples as input TPFs.
-
     """
+
     if isinstance(tpfs, lk.targetpixelfile.TargetPixelFile):
         tpfs = [tpfs]
     if isinstance(tpfs, lk.collections.TargetPixelFileCollection):
@@ -118,7 +117,6 @@ def centroid_test(
         for key in ["1sigma_error"]:
             r[key] = []
 
-    offsets = np.logspace(-6, np.log10(3), 100)[::-1]
     for tpf in tpfs:
         if tpf.mission.lower() in ["kepler", "ktwo", "k2"]:
             pixel_scale = 4
@@ -133,7 +131,8 @@ def centroid_test(
         if crwd is not None:
             if crwd < 0.8:
                 raise ValueError(
-                    f"Aperture is significantly crowded (CROWDSAP = {crwd}). This method will not work to centroid these cases."
+                    f"Aperture is significantly crowded (CROWDSAP = {crwd}). "
+                    "This method will not work to centroid these cases."
                 )
 
         aper = tpf._parse_aperture_mask(aperture_mask)
@@ -167,7 +166,6 @@ def centroid_test(
         ycent = np.average(Y, weights=fe, axis=1)
         xcent = np.asarray([np.nanmean(xcent, axis=1), np.nanstd(xcent, axis=1)]).T
         ycent = np.asarray([np.nanmean(ycent, axis=1), np.nanstd(ycent, axis=1)]).T
-        import pdb
 
         # If the mission is K2, we need to use SFF to detrend the centroids.
         if tpf.mission.lower() in ["ktwo", "k2"]:
@@ -266,13 +264,23 @@ def centroid_test(
                 with plt.style.context("seaborn-white"):
                     xc1 = (xcent[:, 0][k1] - xtr[k1]) * scale
                     yc1 = (ycent[:, 0][k1] - ytr[k1]) * scale
+
+                    xrange = np.nanpercentile(xc1, (1, 99))
+                    dx = np.diff(xrange) / 100
+                    xrange[0] -= dx * 15
+                    xrange[1] += dx * 15
+                    yrange = np.nanpercentile(yc1, (1, 99))
+                    dy = np.diff(yrange) / 100
+                    yrange[0] -= dy * 15
+                    yrange[1] += dy * 15
+
                     corner.hist2d(
                         xc1,
                         yc1,
                         ax=axs[idx],
                         range=[
-                            np.nanpercentile(xc1, (1, 99)),
-                            np.nanpercentile(yc1, (1, 99)),
+                            xrange,
+                            yrange,
                         ],
                     )
                     axs[idx].errorbar(
@@ -283,7 +291,7 @@ def centroid_test(
                         marker=".",
                         markersize=1,
                         c=f"C{idx}",
-                        lw=1,
+                        lw=0.5,
                         ls="",
                         label=f"Transit {labels[idx]} Cadences",
                     )
@@ -304,10 +312,7 @@ def centroid_test(
                 a2 = weighted_average(xcent[k2, 0] - xtr[k2], 1 / xcent[k2, 1])
                 b2 = weighted_average(ycent[k2, 0] - ytr[k2], 1 / ycent[k2, 1])
                 pos_err = np.hypot(np.hypot(a1[1], b1[1]), np.hypot(a2[1], b2[1]))
-
-            if transit_depths is not None:
                 sigma1.append(pixel_scale * pos_err / transit_depths[idx])
-
             if k2.sum() == 0:
                 pvalue = 1
             else:
