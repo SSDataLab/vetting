@@ -1,11 +1,16 @@
-cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+# YAML 1.2
+---
 authors:
-- family-names: "Christina"
-  given-names: "Hedges"
-  orcid: "https://orcid.org/0000-0002-3385-8391
-title: "vetting"
-version: 0.1.9
-doi: 10.5281/zenodo.5637490
-date-released: 2021-01-09
-url: "https://github.com/ssdatalab/vetting"
+  -
+    family-names: Hedges
+    given-names: Christina
+    orcid: "https://orcid.org/0000-0002-3385-8391"
+cff-version: "1.1.0"
+date-released: 2021-11-1
+doi: "10.5281/zenodo.5637490"
+license: MIT
+message: "If you use this software, please cite it using these metadata."
+repository-code: "https://github.com/SSDataLab/vetting"
+title: vetting
+version: "v0.1.9"
+...
