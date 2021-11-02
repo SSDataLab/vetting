@@ -13,7 +13,8 @@ testdir = "/".join(PACKAGEDIR.split("/")[:-2])
 
 def is_action():
     try:
-        return os.environ["GITHUB_ACTIONS"]
+        ga = os.environ["GITHUB_ACTIONS"]
+        return True
     except KeyError:
         return False
 
@@ -142,11 +143,3 @@ def test_FPs():
             dpi=200,
             bbox_inches="tight",
         )
-        # nb = int(1 // np.median(np.diff(tpf.time.value)))
-        # nb = [nb if nb % 2 == 1 else nb + 1][0]
-        # ax = tpf.to_lightcurve().flatten(nb).fold(period, t0).bin(period / 200).plot()
-        # plt.savefig(
-        #     f"{testdir}/docs/{name.replace(' ','').lower()}_lc.png",
-        #     dpi=200,
-        #     bbox_inches="tight",
-        # )
