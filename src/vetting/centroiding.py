@@ -19,8 +19,11 @@ def _label(tpf):
 
 
 def weighted_average(values, weights, axis=None):
-    mean = np.average(values, weights=weights, axis=axis)
-    error = np.average((values - mean) ** 2, weights=weights, axis=axis) ** 0.5
+    try:
+        mean = np.average(values, weights=weights, axis=axis)
+        error = np.average((values - mean) ** 2, weights=weights, axis=axis) ** 0.5
+    except ZeroDivisionError:
+        return np.nan, np.nan
     return mean, error / len(values) ** 0.5
 
 
@@ -122,7 +125,7 @@ def centroid_test(
             pixel_scale = 4
 
         elif tpf.mission.lower() == "tess":
-            pixel_scale = 27
+            pixel_scale = 21
         else:
             raise ValueError(
                 "Can not understand mission keyword in TPF to assign pixel scale."
