@@ -1,8 +1,7 @@
 # YAML 1.2
 ---
 authors:
-  -
-    family-names: Hedges
+  - family-names: Hedges
     given-names: Christina
     orcid: "https://orcid.org/0000-0002-3385-8391"
 cff-version: "1.1.0"
@@ -13,4 +12,17 @@ message: "If you use this software, please cite it using these metadata."
 repository-code: "https://github.com/SSDataLab/vetting"
 title: vetting
 version: "v0.1.9"
+preferred-citation:
+  - family-names: Hedges
+    given-names: Christina
+    orcid: "https://orcid.org/0000-0002-3385-8391"
+  doi: "10.3847/2515-5172/ac376a"
+  journal: "Research Notes of the American Astronomical Society"
+  month: 11
+  start: 262 # First page number
+  end: 264 # Last page number
+  title: "Vetting: A Stand-alone Tool for Finding Centroid Offsets in NASA Kepler, K2, and TESS, Alerting the Presence of Exoplanet False Positives"
+  issue: 11
+  volume: 5
+  year: 2021
 ...
