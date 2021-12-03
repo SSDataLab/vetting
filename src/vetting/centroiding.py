@@ -38,6 +38,7 @@ def centroid_test(
     nsamp=100,
     transit_depths=None,
     labels=None,
+    sff_timescale=3,
 ):
     """
     Runs a simple centroiding test on TPFs for input period, t0 and durations of transiting planet candidates.
@@ -78,6 +79,8 @@ def centroid_test(
         labels: None, list of strings, string
             Optional. Label for each planet in plots. If None, will generate labels in sequential order. e.g. pass `'bcd'` to label
             planets. Must same length as periods.
+        sff_timescale: float
+            The time to use for detrending the centroids using SFF method
     Returns
     -------
         r : dict
@@ -186,7 +189,7 @@ def centroid_test(
                 bins=10,
                 cadence_mask=t_mask,
                 propagate_errors=True,
-                timescale=10,
+                timescale=sff_timescale,
             )
             xcent[:, 0] -= s.model_lc.flux.value
 
@@ -204,7 +207,7 @@ def centroid_test(
                 bins=10,
                 cadence_mask=t_mask,
                 propagate_errors=True,
-                timescale=10,
+                timescale=sff_timescale,
             )
             ycent[:, 0] -= s.model_lc.flux.value
 
