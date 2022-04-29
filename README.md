@@ -4,6 +4,7 @@
 
 [![pypi](https://img.shields.io/pypi/v/vetting)](https://pypi.org/project/vetting/)
 ![pytest](https://github.com/ssdatalab/vetting/workflows/pytest/badge.svg)
+[![paper](https://img.shields.io/badge/RNAAS-read%20the%20paper-blue)](https://iopscience.iop.org/article/10.3847/2515-5172/ac376a)
 
 ## Installation
 
