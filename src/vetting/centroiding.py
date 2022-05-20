@@ -163,7 +163,7 @@ def centroid_test(
 
     nplanets = len(periods)
     r = {}
-    for key in ["figs", "pvalues", "centroid_offset_detected"]:
+    for key in ["figs", "pvalues", "pvalues_x", "pvalues_y", "centroid_offset_detected"]:
         r[key] = []
     if transit_depths is not None:
         for key in ["1sigma_error"]:
@@ -325,7 +325,7 @@ def centroid_test(
                 if not hasattr(axs, "__iter__"):
                     axs = [axs]
 
-        pvalues, sigma1, centroid_offset_detected = [], [], []
+        pvalues, pvalues_x, pvalues_y, sigma1, centroid_offset_detected = [], [], [], [], []
         for idx in range(nplanets):
             # NO Transits
             k1 = (tmasks).all(axis=0)
@@ -379,12 +379,14 @@ def centroid_test(
                     )
                     axs[idx].legend(loc="upper left")
 
-            ps = []
+            ps, ps_x, ps_y = [], [], []
             # ps1 = []
             for x1, y1 in zip(xsamps, ysamps):
                 px = ttest_ind(x1[k1], x1[k2], equal_var=False)
                 py = ttest_ind(y1[k1], y1[k2], equal_var=False)
                 ps.append(np.mean([px.pvalue, py.pvalue]))
+                ps_x.append(px.pvalue)
+                ps_y.append(py.pvalue)
 
             if transit_depths is not None:
                 # Weighted average and weighted standard deviation of out of transit
@@ -396,18 +398,18 @@ def centroid_test(
                 pos_err = np.hypot(np.hypot(a1[1], b1[1]), np.hypot(a2[1], b2[1]))
                 sigma1.append(pixel_scale * pos_err / transit_depths[idx])
             if k2.sum() == 0:
-                pvalue = 1
+                pvalue, pvalue_x, pvalue_y = 1, 1, 1
             else:
-                pvalue = np.mean(ps)
+                pvalue, pvalue_x, pvalue_y = np.mean(ps), np.mean(ps_x), np.mean(ps_y)
             pvalues.append(pvalue)
-            if pvalue < 0.05:
-                centroid_offset_detected.append(True)
-            else:
-                centroid_offset_detected.append(False)
+            pvalues_x.append(pvalue_x)
+            pvalues_y.append(pvalue_y)
+            p_centroid_offset_detected = np.min([pvalue_x, pvalue_y]) < 0.05
+            centroid_offset_detected.append(p_centroid_offset_detected)
 
             if plot:
                 with plt.style.context("seaborn-white"):
-                    if pvalue >= 0.05:
+                    if not p_centroid_offset_detected:
                         label = f"No Significant Offset (p-value: {pvalue:.2E})"
                         if transit_depths is not None:
                             label = (
@@ -445,5 +447,7 @@ def centroid_test(
         if plot:
             r["figs"].append(fig)
         r["pvalues"].append(tuple(pvalues))
+        r["pvalues_x"].append(tuple(pvalues_x))
+        r["pvalues_y"].append(tuple(pvalues_y))
 
     return r
