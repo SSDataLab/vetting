@@ -237,17 +237,16 @@ def centroid_test(
         )
 
         if plot:
-            with plt.style.context("seaborn-white"):
-                fig, axs = plt.subplots(
-                    1,
-                    nplanets,
-                    figsize=(4 * nplanets, 4),
-                    sharex=True,
-                    sharey=True,
-                    facecolor="w",
-                )
-                if not hasattr(axs, "__iter__"):
-                    axs = [axs]
+            fig, axs = plt.subplots(
+                1,
+                nplanets,
+                figsize=(4 * nplanets, 4),
+                sharex=True,
+                sharey=True,
+                facecolor="w",
+            )
+            if not hasattr(axs, "__iter__"):
+                axs = [axs]
 
         pvalues, sigma1, centroid_offset_detected = [], [], []
         for idx in range(nplanets):
@@ -267,41 +266,40 @@ def centroid_test(
                         xlabel="X Centroid [pixel]", title=f"Transit {labels[idx]}"
                     )
 
-                with plt.style.context("seaborn-white"):
-                    xc1 = (xcent[:, 0][k1] - xtr[k1]) * scale
-                    yc1 = (ycent[:, 0][k1] - ytr[k1]) * scale
+                xc1 = (xcent[:, 0][k1] - xtr[k1]) * scale
+                yc1 = (ycent[:, 0][k1] - ytr[k1]) * scale
 
-                    xrange = np.nanpercentile(xc1, (3, 97))
-                    dx = np.diff(xrange) / 100
-                    xrange[0] -= dx * 30
-                    xrange[1] += dx * 30
-                    yrange = np.nanpercentile(yc1, (3, 97))
-                    dy = np.diff(yrange) / 100
-                    yrange[0] -= dy * 30
-                    yrange[1] += dy * 30
+                xrange = np.nanpercentile(xc1, (3, 97))
+                dx = np.diff(xrange) / 100
+                xrange[0] -= dx * 30
+                xrange[1] += dx * 30
+                yrange = np.nanpercentile(yc1, (3, 97))
+                dy = np.diff(yrange) / 100
+                yrange[0] -= dy * 30
+                yrange[1] += dy * 30
 
-                    corner.hist2d(
-                        xc1,
-                        yc1,
-                        ax=axs[idx],
-                        range=[
-                            xrange,
-                            yrange,
-                        ],
-                    )
-                    axs[idx].errorbar(
-                        (xcent[:, 0][k2] - xtr[k2]) * scale,
-                        (ycent[:, 0][k2] - ytr[k2]) * scale,
-                        xerr=(xcent[:, 1][k2]) * scale,
-                        yerr=(ycent[:, 1][k2]) * scale,
-                        marker=".",
-                        markersize=1,
-                        c=f"C{idx}",
-                        lw=0.5,
-                        ls="",
-                        label=f"Transit {labels[idx]} Cadences",
-                    )
-                    axs[idx].legend(loc="upper left")
+                corner.hist2d(
+                    xc1,
+                    yc1,
+                    ax=axs[idx],
+                    range=[
+                        xrange,
+                        yrange,
+                    ],
+                )
+                axs[idx].errorbar(
+                    (xcent[:, 0][k2] - xtr[k2]) * scale,
+                    (ycent[:, 0][k2] - ytr[k2]) * scale,
+                    xerr=(xcent[:, 1][k2]) * scale,
+                    yerr=(ycent[:, 1][k2]) * scale,
+                    marker=".",
+                    markersize=1,
+                    c=f"C{idx}",
+                    lw=0.5,
+                    ls="",
+                    label=f"Transit {labels[idx]} Cadences",
+                )
+                axs[idx].legend(loc="upper left")
 
             ps = []
             # ps1 = []
@@ -330,38 +328,37 @@ def centroid_test(
                 centroid_offset_detected.append(False)
 
             if plot:
-                with plt.style.context("seaborn-white"):
-                    if pvalue >= 0.05:
-                        label = f"No Significant Offset (p-value: {pvalue:.2E})"
-                        if transit_depths is not None:
-                            label = (
-                                label
-                                + f"\n1 Sigma Error: {(np.round(sigma1[idx], 2) * u.arcsecond).to_string(format='latex')}"
-                            )
-                        axs[idx].text(
-                            0.975,
-                            0.05,
-                            label,
-                            horizontalalignment="right",
-                            verticalalignment="center",
-                            transform=axs[idx].transAxes,
-                        )
-                    else:
-                        axs[idx].text(
-                            0.975,
-                            0.05,
-                            f"Offset Detected(p-value: {pvalue:.2E})",
-                            horizontalalignment="right",
-                            verticalalignment="center",
-                            transform=axs[idx].transAxes,
-                            color="r",
-                        )
-                    plt.suptitle(_label(tpf))
+                if pvalue >= 0.05:
+                    label = f"No Significant Offset (p-value: {pvalue:.2E})"
                     if transit_depths is not None:
-                        axs[0].set_ylabel('Y Centroid ["]')
-                    else:
-                        axs[0].set_ylabel("Y Centroid [pixel]")
-                    plt.subplots_adjust(wspace=0)
+                        label = (
+                            label
+                            + f"\n1 Sigma Error: {(np.round(sigma1[idx], 2) * u.arcsecond).to_string(format='latex')}"
+                        )
+                    axs[idx].text(
+                        0.975,
+                        0.05,
+                        label,
+                        horizontalalignment="right",
+                        verticalalignment="center",
+                        transform=axs[idx].transAxes,
+                    )
+                else:
+                    axs[idx].text(
+                        0.975,
+                        0.05,
+                        f"Offset Detected(p-value: {pvalue:.2E})",
+                        horizontalalignment="right",
+                        verticalalignment="center",
+                        transform=axs[idx].transAxes,
+                        color="r",
+                    )
+                plt.suptitle(_label(tpf))
+                if transit_depths is not None:
+                    axs[0].set_ylabel('Y Centroid ["]')
+                else:
+                    axs[0].set_ylabel("Y Centroid [pixel]")
+                plt.subplots_adjust(wspace=0)
 
         if transit_depths is not None:
             r["1sigma_error"].append(np.asarray(sigma1) * u.arcsecond)
